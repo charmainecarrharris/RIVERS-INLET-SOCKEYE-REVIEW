@@ -3,4 +3,4 @@ Data and code for Rivers Inlet sockeye review. No code yet. DATA folder contains
 
 Background information for these data (technical report) and other reference material are stored in a Dropbox folder that can be accessed at https://www.dropbox.com/sh/4l5rtdmet1q60ez/AABtrgbXScp4g012gSeJAKdca?dl=0
 
-Data and code in this repository is under development, so use at your own risk and note that developers are not responsible for any results or conclusions derived from use of these materials.
+Please note that data and code in this repository are under development, so use at your own risk! Developers are not responsible for any results or conclusions derived from use of these materials.
