@@ -107,6 +107,7 @@ model{
   // Priors
   lnalpha ~ normal(0,3);
   beta ~ normal(0,1);
+  //beta ~ normal(0.1638,0.05); // PR based prior, inverse of PR based Smax in units of 100,000s, so if Smax = 6.10354 then mean of prior is 1/6.10354 = 0.1638
   sigma_R ~ normal(0,2);
   lnresid_0 ~ normal(0,20);
   mean_ln_R0 ~ normal(0,20);
@@ -124,7 +125,7 @@ model{
     }
   }
 
-  // First `a.max` years of recruits, for which there is no spawner link
+  // First `a_max` years of recruits, for which there is no spawner link
   lnR[1:a_max] ~ normal(mean_ln_R0, sigma_R0);
 
   // State model
@@ -142,25 +143,25 @@ model{
 
 generated quantities {
   // biological reference points
-   real<lower=0> S_max; // spawner abundance that produces maximum recruitment
-   real<lower=0> S_eq; // equilibrium spawner abundance
-   real<lower=0> S_msy; // spawner abundance that produces maximum sustainable yield
-   real<lower=0, upper=1> U_msy; // harvest rate that maximizes yield
-   vector[nRyrs] lnalpha_time;
-  // real<lower=0> lnalpha_c; // bias corrected log alpha
-  // real<lower=0> S_eq_c; // bias corrected equilibrium spawner abundance
-  // real<lower=0> S_msy_c; // bias corrected spawner abundance that produces maximum sustainable yield
-  // real<lower=0, upper=1> U_msy_c; // bias corrected harvest rate that maximizes yield
-  // 
-   S_max = 1/beta;
-   S_eq = lnalpha * S_max;
-   S_msy = S_eq * (0.5 - 0.07 * lnalpha);
-   U_msy = lnalpha * (0.5 - 0.07 * lnalpha);
-   lnalpha_time = lnalpha +lnresid;
-  // lnalpha_c = lnalpha + (sigma_R * sigma_R)/2/(1-phi * phi);
-  // S_eq_c = lnalpha_c * S_max;
-  // S_msy_c = S_eq * (0.5 - 0.07 * lnalpha_c);
-  // U_msy_c = lnalpha_c * (0.5 - 0.07 * lnalpha_c);
+  real<lower=0> S_max; // spawner abundance that produces maximum recruitment
+  real<lower=0> S_eq; // equilibrium spawner abundance
+  real<lower=0> S_msy; // spawner abundance that produces maximum sustainable yield
+  real<lower=0, upper=1> U_msy; // harvest rate that maximizes yield
+  vector[nRyrs] lnalpha_y;
+  real<lower=0> lnalpha_c; // bias corrected log alpha
+  real<lower=0> S_eq_c; // bias corrected equilibrium spawner abundance
+  real S_msy_c; // bias corrected spawner abundance that produces maximum sustainable yield
+  real U_msy_c; // bias corrected harvest rate that maximizes yield
+  
+  S_max = 1/beta;
+  S_eq = lnalpha * S_max;
+  S_msy = S_eq * (0.5 - 0.07 * lnalpha);
+  U_msy = lnalpha * (0.5 - 0.07 * lnalpha);
+  lnalpha_y = lnalpha +lnresid;
+  lnalpha_c = lnalpha + (sigma_R * sigma_R)/2/(1-phi * phi);
+  S_eq_c = lnalpha_c * S_max;
+  S_msy_c = S_eq * (0.5 - 0.07 * lnalpha_c);
+  U_msy_c = lnalpha_c * (0.5 - 0.07 * lnalpha_c);
 
 }
 
