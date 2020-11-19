@@ -1,0 +1,278 @@
+---
+title: "Plot Rivers Inlet Sockeye Salmon State-Space Spawner-Recruitment Model Results"
+author: "B. Connors"
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output:
+  html_document:
+    collapsed: no
+    fig_caption: yes
+    highlight: espresso
+    number_sections: yes
+    smooth_scroll: yes
+    theme: sandstone
+    toc: yes
+    toc_float: yes
+---
+# Purpose
+
+The purpose of this document is to summarize spawner-recruitment model output and diagnostics in a unified format for ease of review. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, cache=FALSE, include=TRUE)
+options(scipen=1, digits=4)
+# options(width=50, width.cutoff=50, digits = 6) 
+require(kintr)
+require(tidyverse)
+require(PBSmodelling)
+require(MASS)
+require(RColorBrewer)
+require(stringr)
+require(lubridate)
+require(pander)
+require(kableExtra)
+require(ggthemes)
+require(xlsx)
+require(plotly)
+require(rstan)
+require(tidybayes)
+require(mcmcplots)
+require(mltools)
+require(viridis)
+
+# Control Section
+do.traceplots <- TRUE
+
+# Read in Model Data and Output Files
+stan.fit <- readRDS(file="./output/stan.fit.rds")
+stan.data <- readRDS(file="./output/stan.data.rds")
+
+fy <- 1948 # first year of spawner observations
+years <- seq(fy, (fy+stan.data$nyrs-1))
+brood_yrs <- seq(fy,fy+stan.data$nyrs-4)
+
+stan.summary <- data.frame(summary(stan.fit)$summary)
+
+pars <- rstan::extract(stan.fit)
+```
+
+# Basic Convergence Diagnostics
+## Effective Sample Size 
+Ideally effective sample sizes are > 400.
+
+```{r}
+hist(stan.summary$n_eff, 
+     col="red", 
+     breaks=50, 
+     main="",
+     yaxt="n",
+     xlab="Effective sample size")
+axis(2,las=2)
+box(col="grey")
+```
+
+## R-hat Convergence Diagnostic
+Compares the between- and within-chain estimates for model parameters and other univariate quantities of interest. If chains have not mixed well (i.e., the between- and within-chain estimates don't agree), R-hat is larger than 1. We recommend running at least four chains by default and only using the sample if R-hat is less than 1.05. Stan reports R-hat which is the maximum of rank normalized split-R-hat and rank normalized folded-split-R-hat, which works for thick tailed distributions and is sensitive also to differences in scale.
+
+```{r}
+hist(stan.summary$Rhat, 
+     col="royalblue", 
+     breaks=50, 
+     main="",
+     yaxt="n",
+     xlab="R-hat")
+axis(2,las=2)
+box(col="grey")
+```
+
+# Key posterior estimates
+Biological reference points are in hundreds of thousands and log-normal bias corrected
+```{r}
+kable(round(summary(stan.fit, pars= c("lnalpha", "lnalpha_c","beta", "sigma_R", "sigma_R0", "phi", "S_max", "S_eq_c", "S_msy_c", "S_msy_c","U_msy_c"))$summary,digits=2)[,c(1,4,6,8:10)],
+      align = "crr") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+```
+
+# Model Predictions and Fits
+## Escapement 
+
+Observations are blue points and model predictions are median (black line) and 50th and 97.5th intervals
+```{r}
+# Extract Data
+obs <- stan.data$S_obs
+
+# Model predictions
+pred <-pars$S
+pred.quant <- apply(pred, 2, quantile, probs=c(0.025,0.25,0.5,0.75,0.975))
+
+spawners <- as.data.frame(cbind(years, obs, t(pred.quant)))
+colnames(spawners) <- c("year","obs","lwr","midlwr","mid","midupper","upper")
+
+
+# Plot
+ggplot(spawners, aes(x=year, y = mid), show.legend = F) +
+  geom_line(show.legend = F) + 
+  geom_ribbon(aes(ymin = lwr, ymax = upper), show.legend = F, alpha=0.2) +
+  geom_ribbon(aes(ymin = midlwr, ymax = midupper), show.legend = F, alpha=0.2) +
+  geom_point(aes(x=years, y = obs), size=2,show.legend = F, col="royalblue") +
+  xlab("Year") +
+  ylab("Escapement (10^5) ") +
+  theme(legend.position = "none") +
+  theme_bw()
+ggsave("./figures/escape-fit.jpg",height = 4.5, width = 6)
+
+```
+
+## Harvest 
+Observations are blue points and model predictions are median (black line) and 50th and 97.5th intervals
+```{r}
+# Extract Data
+obs <- stan.data$H_obs
+
+# Model predictions
+pred <-pars$C
+pred.quant <- apply(pred, 2, quantile, probs=c(0.025,0.25,0.5,0.75,0.975))
+
+spawners <- as.data.frame(cbind(years, obs, t(pred.quant)))
+colnames(spawners) <- c("year","obs","lwr","midlwr","mid","midupper","upper")
+
+
+# Plot
+ggplot(spawners, aes(x=year, y = mid), show.legend = F) +
+  geom_line(show.legend = F) + 
+  geom_ribbon(aes(ymin = lwr, ymax = upper), show.legend = F, alpha=0.2) +
+  geom_ribbon(aes(ymin = midlwr, ymax = midupper), show.legend = F, alpha=0.2) +
+  geom_point(aes(x=years, y = obs), size=2,show.legend = F, col="royalblue") +
+  xlab("Year") +
+  ylab("Harvest (10^5) ") +
+  theme(legend.position = "none") +
+  theme_bw()
+ggsave("./figures/harvest-fit.jpg",height = 4.5, width = 6)
+
+```
+
+## Age composition 
+Observations are blue points and model predictions are median (black line) and 50th and 97.5th intervals.
+```{r}
+# extract Data
+obs <- stan.data$A_obs/rowSums(stan.data$A_obs)
+
+# model predictions
+pred <-pars$p
+pred.quant <- apply(pred, c(2,3), quantile, probs=c(0.025,0.25,0.5,0.75,0.975))
+
+# wrangle observations and predictions into a data frame for ggplot
+age_comps <- matrix(NA,(length(years)*4), 8)
+colnames(age_comps) <- c("years","age_class","obs","lwr","midlwr","mid","midupper","upper")
+age_comps[,1] <- rep(years,4)
+age_comps[,2] <- rep(3:6,each = length(years))
+age_comps[,3] <- as.vector(obs[,1:4])
+age_comps[,4] <- as.vector(pred.quant[1,1:length(years),])
+age_comps[,5] <- as.vector(pred.quant[2,1:length(years),])
+age_comps[,6] <- as.vector(pred.quant[3,1:length(years),])
+age_comps[,7] <- as.vector(pred.quant[4,1:length(years),])
+age_comps[,8] <- as.vector(pred.quant[5,1:length(years),])
+age_comps <- as.data.frame(age_comps)
+age_comps$age_classF <- as.factor(age_comps$age_class)
+
+# plot
+ggplot(age_comps, aes(x=years, y = mid), show.legend = F) +
+  geom_line(show.legend = F) + 
+  geom_ribbon(aes(ymin = lwr, ymax = upper), show.legend = F, alpha=0.2) +
+  geom_ribbon(aes(ymin = midlwr, ymax = midupper), show.legend = F, alpha=0.2) +
+  geom_point(aes(x=years, y = obs), size=2,show.legend = F, col="royalblue") +
+  facet_wrap(~age_classF, scales = "free_y")+
+  xlab("Year") +
+  ylab("Proportion") +
+  theme(legend.position = "none") +
+  theme_bw()
+ggsave("./figures/age-comp-fit.jpg",height = 4.5, width = 6)
+
+```
+
+## Spawner-recruitment relationship
+Predictions are median (black line and points) and 97.5th intervals. Includes recruitment for incomplete brood years at end of time series. 
+
+```{r,warning = FALSE,}
+spwn <-pars$S
+spwn.quant <- apply(spwn, 2, quantile, probs=c(0.025,0.5,0.975))[,1:(length(years)-4)]
+
+rec <-pars$R
+rec.quant <- apply(rec, 2, quantile, probs=c(0.025,0.5,0.975))[,8:dim(pars$R)[2]]
+
+
+brood_t <- as.data.frame(cbind(years[1:(length(years)-4)],t(spwn.quant), t(rec.quant)))
+colnames(brood_t) <- c("BroodYear","S_lwr","S_med","S_upr","R_lwr","R_med","R_upr")
+
+brood_t <- as.data.frame(brood_t)
+
+# SR relationship
+spw <- seq(0,max(brood_t[,4]),length.out=100)
+SR_pred <- matrix(NA,100,10000)
+posteriors <- as.matrix(stan.fit)
+
+for(i in 1:10000){
+  r <- sample(seq(1,1000),1,replace=T)
+  a <- pars$lnalpha_c[r]
+  b <- pars$beta[r]
+  SR_pred[,i] <- (exp(a)*spw*exp(-b*spw))
+}
+
+SR_pred <- cbind(spw,t(apply(SR_pred,c(1),quantile,probs=c(0.05,0.5,0.95),na.rm=T)))
+colnames(SR_pred) <- c("Spawn", "Rec_lwr","Rec_med","Rec_upr")
+SR_pred <- as.data.frame(SR_pred)
+
+ggplot() +
+  geom_ribbon(data = SR_pred, aes(x = Spawn, ymin = Rec_lwr, ymax = Rec_upr), 
+              fill = "grey80", alpha=0.5, linetype=2, colour="gray46") +
+  geom_line(data = SR_pred, aes(x = Spawn, y = Rec_med), color="black", size = 1) +
+  geom_errorbar(data = brood_t, aes(x= S_med, y = R_med, ymin = R_lwr, ymax = R_upr), 
+                colour="grey", width=0.2, size=0.3) +
+  geom_errorbarh(data = brood_t, aes(x= S_med, y = R_med, xmin = S_lwr, xmax = S_upr), 
+                 height=0, colour = "grey", width=0.2, size = 0.3) + 
+  geom_point(data = brood_t, aes(x = S_med, y = R_med, color=BroodYear, width = 0.9), size = 3)+
+  coord_cartesian(xlim=c(0, max(brood_t[,4])), ylim=c(0,max(brood_t[,7]))) +
+  scale_colour_viridis_c()+
+  xlab("Spawners (10^5)") +
+  ylab("Recruits (10^5)") +
+  theme_bw() +
+  theme(strip.text.x = element_text(size=8),
+        axis.title = element_text(size=10),
+        axis.text = element_text(size=7))+
+  geom_abline(intercept = 0, slope = 1,col="dark grey")
+ggsave("./figures/spawn-recuit.jpg",height = 4.5, width = 6)
+
+```
+
+## Productivity over time 
+Predictions are median (black line) and 50th and 97.5th intervals.
+```{r}
+
+pred <-pars$lnalpha_y
+pred.quant <- apply(pred, 2, quantile, probs=c(0.025,0.25,0.5,0.75,0.975))[,8:dim(pars$lnalpha_y)[2]]
+
+log_prod_t <- as.data.frame(cbind(years[1:(length(years)-4)], t(pred.quant)))
+colnames(log_prod_t) <- c("year","lwr","midlwr","mid","midupper","upper")
+
+# Plot
+ggplot(log_prod_t, aes(x=year, y = mid), show.legend = F) +
+  geom_line(show.legend = F) + 
+  geom_ribbon(aes(ymin = lwr, ymax = upper), show.legend = F, alpha=0.2) +
+  geom_ribbon(aes(ymin = midlwr, ymax = midupper), show.legend = F, alpha=0.2) +
+  xlab("Brood year") +
+  ylab("Productivity (log) ") +
+  theme(legend.position = "none") +
+  theme_bw()
+ggsave("./figures/time-vary-prod.jpg",height = 4.5, width = 6)
+
+```
+
+# Model Parameters
+Summary of all model parameters.
+
+```{r}
+kable(data.frame(stan.summary), align="crr") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+

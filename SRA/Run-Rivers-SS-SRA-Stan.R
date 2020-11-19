@@ -25,7 +25,7 @@ nRyrs <- nyrs + A - 1
 
 # deal with age comps
 raw_age_comps <- read.csv('DATA/Data_report_tables/Table_6_esc_age_comp.csv')
-A_comp <- matrix(NA, nrow = length(Esc), ncol = 5) # matrix to store age comps in
+A_comp <- matrix(NA, nrow = length(Esc), ncol = 4) # matrix to store age comps in
 
 # years with data 
 A_comp[42:72,1] <- rowSums(raw_age_comps[30:60,2:3]) # combine age 2 and 3 into age 3 for years with data
@@ -34,13 +34,15 @@ A_comp[13:72,2] <- raw_age_comps[1:60,4] # age 4 for years with data
 A_comp[13:72,3] <- raw_age_comps[1:60,5] # age 5 for years with data
 A_comp[13:72,4] <- raw_age_comps[1:60,6] # age 6 for years with data, replaced nas with 0 in years with data for other age comps
 
-# years without data
 A_comp <- as.data.frame(A_comp)
-comp_means <- colMeans(A_comp[30:60,],na.rm=T)
-A_comp <- A_comp %>% replace_na(list(V1=comp_means[1],
-                           V2=comp_means[2],
-                           V3=comp_means[3],
-                           V4=comp_means[4]))
+
+# which years are missing age comps?
+missing <- which(is.na(A_comp$V1))
+
+# assign average age comps to missing years
+for(i in missing){
+  A_comp[i,] <- colMeans(A_comp[30:60,],na.rm=T)
+}
 
 # age comp sample sizes
 #A_comp[42:72,5] <- raw_age_comps$Sample.size[30:60] # assume ESS equal to true sample sizes for years with data
@@ -98,7 +100,6 @@ stan.data <- list("nyrs" = nyrs,
                   "S_cv" = S_cv,
                   "H_cv" = H_cv)
 
-  
 # fit 
 stan.fit <- stan(file = "SRA/SSSR_AR1.stan",
                  model_name = "Rivers-SSSR-AR1",
@@ -109,87 +110,15 @@ stan.fit <- stan(file = "SRA/SSSR_AR1.stan",
                  init = init_ll)
   
 # Summarize model ===================================================================================
-shinystan::launch_shinystan(stan.fit)  
+#shinystan::launch_shinystan(stan.fit)  
 
-pairs(stan.fit, pars = c("lnalpha", "beta", "sigma_R", "sigma_R0", "phi", "mean_ln_R0","lnR[1]", "lnR[2]"))
+#pairs(stan.fit, pars = c("lnalpha", "beta", "sigma_R", "sigma_R0", "phi", "mean_ln_R0","lnR[1]", "lnR[2]"))
 
-summary(stan.fit, pars= c("lnalpha", "beta", "sigma_R", "sigma_R0", "phi", "mean_ln_R0","S_max", "S_eq", "S_msy", "U_msy"))$summary[,4:10]  
+#summary(stan.fit, pars= c("lnalpha", "beta", "sigma_R", "sigma_R0", "phi", "mean_ln_R0","S_max", "S_eq", "S_msy", "U_msy"))$summary[,4:10]  
   
+# save fitted model object 
+saveRDS(stan.fit, file="./SRA/output/stan.fit.rds")
 
-# Spawner-recruit figure =============================================================================
+# save model data object 
+saveRDS(stan.data, file="./SRA/output/stan.data.rds")
 
-# brood table
-fy <- 1948 # first year of spawners
-no_by <- 69 # no. of brood years
-byrs <- seq(fy,fy+no_by-1)
-
-spwn <- summary(stan.fit, pars= c("S"),probs = c(0.025, 0.50, 0.975))$summary[,4:6]  
-rec <- summary(stan.fit, pars= c("R"),probs = c(0.025, 0.50, 0.975))$summary[,4:6] 
-
-bt <- matrix(NA,no_by,7)
-bt[,1] <- byrs
-bt[,2:4] <- spwn[1:no_by,]
-bt[,5:7] <- rec[(a_max + 1):nRyrs,]
-colnames(bt) <- c("BroodYear","S_lwr","S_med","S_upr","R_lwr","R_med","R_upr")
-bt <- as.data.frame(bt)
-
-# SR relationship
-spw <- seq(0,max(spwn[,2]*1.5),length.out=100)
-SR_pred <- matrix(NA,100,10000)
-posteriors <- as.matrix(stan.fit)
-
-for(i in 1:10000){
-  r <- sample(seq(1,1000),1,replace=T)
-  a <- posteriors[r,"lnalpha"]
-  b <- posteriors[r,"beta"]
-  SR_pred[,i] <- (exp(a)*spw*exp(-b*spw))
-}
-
-SR_pred <- cbind(spw,t(apply(SR_pred,c(1),quantile,probs=c(0.05,0.5,0.95),na.rm=T)))
-colnames(SR_pred) <- c("Spawn", "Rec_lwr","Rec_med","Rec_upr")
-SR_pred <- as.data.frame(SR_pred)
-
-ggplot() +
-  geom_ribbon(data = SR_pred, aes(x = Spawn, ymin = Rec_lwr, ymax = Rec_upr), 
-              fill = "grey80", alpha=0.5, linetype=2, colour="gray46") +
-  geom_line(data = SR_pred, aes(x = Spawn, y = Rec_med), color="black", size = 1) +
-  geom_errorbar(data = bt, aes(x= S_med, y = R_med, ymin = R_lwr, ymax = R_upr), width=0,colour="light grey", width=0.2, size=0.3) +
-  geom_errorbarh(data = bt, aes(x= S_med, y = R_med, xmin = S_lwr, xmax = S_upr), 
-                 height=0,colour = "light grey", width=0.2, size = 0.3) + 
-  geom_point(data = bt, aes(x = S_med, y = R_med, color=BroodYear, width=0.9), size=2)+
-  coord_cartesian(xlim=c(0, 33), ylim=c(0,50))+
-  scale_colour_viridis_c()+
-  xlab("Spawners (100,000s)") +
-  ylab("Recruits (100,000s)") +
-  theme_bw() +
-  theme(strip.text.x = element_text(size=8),
-        axis.title = element_text(size=10),
-        axis.text = element_text(size=7))+
-  geom_abline(intercept = 0, slope = 1)
-ggsave("./FIGURES/SS-SRA_spawner-recruit.jpg",height = 4.5, width = 6)
-
-# AR-1 prod figure =============================================================================
-
-resid <- summary(stan.fit, pars= c("lnalpha_time"),probs = c(0.025, 0.50, 0.975))$summary[(a_max + 1):nRyrs,4:6]
-resid_exp <- exp(summary(stan.fit, pars= c("lnalpha_time"),probs = c(0.025, 0.50, 0.975))$summary[(a_max + 1):nRyrs,4:6])
-
-alpha_resid <- matrix(NA,no_by,4)
-alpha_resid[,1] <- byrs
-alpha_resid[,2:4] <- resid[1:no_by,]
-colnames(alpha_resid) <- c("BroodYear","lnResid_lwr","lnResid_med","lnResid_upr")
-alpha_resid <- as.data.frame(alpha_resid)
-
-
-ggplot(alpha_resid, aes(x=BroodYear, y = lnResid_med ), show.legend = F) +
-  geom_point(size=1,show.legend = F)+
-  geom_line(show.legend = F) + 
-  geom_ribbon(aes(ymin = lnResid_lwr, ymax = lnResid_upr), show.legend = F, alpha=0.4) +
-  xlab("Brood year") +
-  ylab("Productivity index") +
-  theme(legend.position = "none") +
-  geom_hline(yintercept = 0, lty = "dotted") +
-  theme_bw()
-ggsave("./FIGURES/SS-SRA_prod_index.jpg",height = 3, width = 8.5)
-
-
-  
