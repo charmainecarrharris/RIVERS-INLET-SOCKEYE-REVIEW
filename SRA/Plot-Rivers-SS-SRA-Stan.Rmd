@@ -158,7 +158,7 @@ Observations are blue points and model predictions are median (black line) and 5
 obs <- stan.data$A_obs/rowSums(stan.data$A_obs)
 
 # model predictions
-pred <-pars$p
+pred <-pars$q
 pred.quant <- apply(pred, c(2,3), quantile, probs=c(0.025,0.25,0.5,0.75,0.975))
 
 # wrangle observations and predictions into a data frame for ggplot

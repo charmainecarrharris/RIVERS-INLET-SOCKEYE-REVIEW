@@ -16,7 +16,7 @@ setwd(here())
 Esc <- read.csv('DATA/Data_report_tables/Table_3_Expanded_estimates.csv')[,2];Esc <- Esc[!is.na(Esc)]  # read in escapement as median of expanded estimates, drop nas
 Har <- read.csv('DATA/Data_report_tables/Table_4_harvest.csv')[,2] # removed commas from some entries in csv file before reading
 S_cv <- read.csv('DATA/Data_report_tables/Table_3_Expanded_estimates.csv')[,10] # removed % from values in csv file before reading
-H_cv <- rep(0.05,length(Har)) # placeholder for CV on harvest observations
+H_cv <- rep(0.15,length(Har)) # placeholder for CV on harvest observations
 a_min <- 3
 a_max <- 6
 nyrs <- length(Esc)
@@ -46,8 +46,8 @@ for(i in missing){
 
 # age comp sample sizes
 #A_comp[42:72,5] <- raw_age_comps$Sample.size[30:60] # assume ESS equal to true sample sizes for years with data
-A_comp[42:72,5] <- 100 # assume ESS equal to 100 for years with data
-A_comp[1:41,5] <- 50 # assume ESS of 50 for years without age comp sample size data
+A_comp[42:72,5] <- 60 # assume ESS equal to 100 for years with data
+A_comp[1:41,5] <- 25 # assume ESS of 50 for years without age comp sample size data
 
 # write to file in case needed elsewhere
 A_comp_print <- cbind(seq(1948,2019),A_comp)
