@@ -18,7 +18,7 @@ output:
 The purpose of this document is to summarize spawner-recruitment model output and diagnostics in a unified format for ease of review. 
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message=FALSE, cache=FALSE, include=TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE, cache=FALSE, include=TRUE)
 options(scipen=1, digits=4)
 # options(width=50, width.cutoff=50, digits = 6) 
 require(kintr)
@@ -43,8 +43,8 @@ require(viridis)
 do.traceplots <- TRUE
 
 # Read in Model Data and Output Files
-stan.fit <- readRDS(file="./output/stan.fit.rds")
-stan.data <- readRDS(file="./output/stan.data.rds")
+stan.fit <- readRDS(file="./output/stan.fit.v2.rds")
+stan.data <- readRDS(file="./output/stan.data.v2.rds")
 
 fy <- 1948 # first year of spawner observations
 years <- seq(fy, (fy+stan.data$nyrs-1))
@@ -151,21 +151,21 @@ ggsave("./figures/harvest-fit.jpg",height = 4.5, width = 6)
 
 ```
 
-## Age composition 
+## Escapement age composition 
 Observations are blue points and model predictions are median (black line) and 50th and 97.5th intervals.
 ```{r}
 # extract Data
-obs <- stan.data$A_obs/rowSums(stan.data$A_obs)
+obs <- stan.data$S_comps/rowSums(stan.data$S_comps)
 
 # model predictions
-pred <-pars$q
+pred <-pars$S_pa
 pred.quant <- apply(pred, c(2,3), quantile, probs=c(0.025,0.25,0.5,0.75,0.975))
 
 # wrangle observations and predictions into a data frame for ggplot
 age_comps <- matrix(NA,(length(years)*4), 8)
 colnames(age_comps) <- c("years","age_class","obs","lwr","midlwr","mid","midupper","upper")
 age_comps[,1] <- rep(years,4)
-age_comps[,2] <- rep(3:6,each = length(years))
+age_comps[,2] <- rep(4:7,each = length(years))
 age_comps[,3] <- as.vector(obs[,1:4])
 age_comps[,4] <- as.vector(pred.quant[1,1:length(years),])
 age_comps[,5] <- as.vector(pred.quant[2,1:length(years),])
@@ -186,9 +186,46 @@ ggplot(age_comps, aes(x=years, y = mid), show.legend = F) +
   ylab("Proportion") +
   theme(legend.position = "none") +
   theme_bw()
-ggsave("./figures/age-comp-fit.jpg",height = 4.5, width = 6)
+ggsave("./figures/esc-age-comp-fit.jpg",height = 4.5, width = 6)
 
 ```
+## Harvest age composition 
+Observations are blue points and model predictions are median (black line) and 50th and 97.5th intervals.
+```{r}
+# extract Data
+obs <- stan.data$H_comps/rowSums(stan.data$H_comps)
+
+# model predictions
+pred <-pars$C_pa
+pred.quant <- apply(pred, c(2,3), quantile, probs=c(0.025,0.25,0.5,0.75,0.975))
+pred.quant[,49:72,] <- 0
+# wrangle observations and predictions into a data frame for ggplot
+age_comps <- matrix(NA,(length(years)*4), 8)
+colnames(age_comps) <- c("years","age_class","obs","lwr","midlwr","mid","midupper","upper")
+age_comps[,1] <- rep(years,4)
+age_comps[,2] <- rep(4:7,each = length(years))
+age_comps[,3] <- as.vector(obs[,1:4])
+age_comps[,4] <- as.vector(pred.quant[1,1:length(years),])
+age_comps[,5] <- as.vector(pred.quant[2,1:length(years),])
+age_comps[,6] <- as.vector(pred.quant[3,1:length(years),])
+age_comps[,7] <- as.vector(pred.quant[4,1:length(years),])
+age_comps[,8] <- as.vector(pred.quant[5,1:length(years),])
+age_comps <- as.data.frame(age_comps)
+age_comps$age_classF <- as.factor(age_comps$age_class)
+
+# plot
+ggplot(age_comps, aes(x=years, y = mid), show.legend = F) +
+  geom_line(show.legend = F) + 
+  geom_ribbon(aes(ymin = lwr, ymax = upper), show.legend = F, alpha=0.2) +
+  geom_ribbon(aes(ymin = midlwr, ymax = midupper), show.legend = F, alpha=0.2) +
+  geom_point(aes(x=years, y = obs), size=2,show.legend = F, col="royalblue") +
+  facet_wrap(~age_classF, scales = "free_y")+
+  xlab("Year") +
+  ylab("Proportion") +
+  theme(legend.position = "none") +
+  theme_bw()
+```
+
 
 ## Spawner-recruitment relationship
 Predictions are median (black line and points) and 97.5th intervals. Includes recruitment for incomplete brood years at end of time series. 
@@ -221,26 +258,88 @@ for(i in 1:10000){
 SR_pred <- cbind(spw,t(apply(SR_pred,c(1),quantile,probs=c(0.05,0.5,0.95),na.rm=T)))
 colnames(SR_pred) <- c("Spawn", "Rec_lwr","Rec_med","Rec_upr")
 SR_pred <- as.data.frame(SR_pred)
+# 
+# ggplot() +
+#   geom_ribbon(data = SR_pred, aes(x = Spawn, ymin = Rec_lwr, ymax = Rec_upr), 
+#               fill = "grey80", alpha=0.5, linetype=2, colour="gray46") +
+#   geom_line(data = SR_pred, aes(x = Spawn, y = Rec_med), color="black", size = 1) +
+#   geom_errorbar(data = brood_t, aes(x= S_med, y = R_med, ymin = R_lwr, ymax = R_upr), 
+#                 colour="grey", width=0.2, size=0.3) +
+#   geom_errorbarh(data = brood_t, aes(x= S_med, y = R_med, xmin = S_lwr, xmax = S_upr), 
+#                  height=0, colour = "grey", width=0.2, size = 0.3) + 
+#   geom_point(data = brood_t, aes(x = S_med, y = R_med, color=BroodYear, width = 0.9), size = 3)+
+#   coord_cartesian(xlim=c(0, max(brood_t[,4])), ylim=c(0,max(brood_t[,7]))) +
+#   scale_colour_viridis_c()+
+#   xlab("Spawners (10^5)") +
+#   ylab("Recruits (10^5)") +
+#   theme_bw() +
+#   theme(strip.text.x = element_text(size=8),
+#         axis.title = element_text(size=10),
+#         axis.text = element_text(size=7))+
+#   geom_abline(intercept = 0, slope = 1,col="dark grey")
+# ggsave("./figures/spawn-recuit.jpg",height = 4.5, width = 6)
 
-ggplot() +
+
+
+p<- ggplot() +
   geom_ribbon(data = SR_pred, aes(x = Spawn, ymin = Rec_lwr, ymax = Rec_upr), 
               fill = "grey80", alpha=0.5, linetype=2, colour="gray46") +
   geom_line(data = SR_pred, aes(x = Spawn, y = Rec_med), color="black", size = 1) +
   geom_errorbar(data = brood_t, aes(x= S_med, y = R_med, ymin = R_lwr, ymax = R_upr), 
-                colour="grey", width=0.2, size=0.3) +
+                colour="grey", width=0, size=0.3) +
   geom_errorbarh(data = brood_t, aes(x= S_med, y = R_med, xmin = S_lwr, xmax = S_upr), 
-                 height=0, colour = "grey", width=0.2, size = 0.3) + 
+                 height=0, colour = "grey", height = 0, size = 0.3) + 
   geom_point(data = brood_t, aes(x = S_med, y = R_med, color=BroodYear, width = 0.9), size = 3)+
-  coord_cartesian(xlim=c(0, max(brood_t[,4])), ylim=c(0,max(brood_t[,7]))) +
+  coord_cartesian(xlim=c(0, 32), ylim=c(0,max(brood_t[,7]))) +
   scale_colour_viridis_c()+
   xlab("Spawners (10^5)") +
   ylab("Recruits (10^5)") +
   theme_bw() +
   theme(strip.text.x = element_text(size=8),
         axis.title = element_text(size=10),
-        axis.text = element_text(size=7))+
+        axis.text = element_text(size=7),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())+
   geom_abline(intercept = 0, slope = 1,col="dark grey")
-ggsave("./figures/spawn-recuit.jpg",height = 4.5, width = 6)
+
+ggExtra::ggMarginal(p + 
+                      theme(legend.position = c(.85,.8),
+                            legend.text = element_text(size = 7),
+                            legend.title = element_text(size = 7),
+                            legend.key.size = unit(0.5, 'cm')), 
+                    fill="light grey", 
+                    type = "histogram", 
+                    colour = "grey")
+ggsave("./figures/spawn-recuit.jpg",height = 5, width = 5.5)
+
+
+```
+
+
+## Spawner-recruitment relationship at low spawner abundances
+```{r}
+
+ggplot() +
+  geom_ribbon(data = SR_pred, aes(x = Spawn, ymin = Rec_lwr, ymax = Rec_upr), 
+              fill = "grey80", alpha=0.5, linetype=2, colour="gray46") +
+  geom_line(data = SR_pred, aes(x = Spawn, y = Rec_med), color="black", size = 1) +
+  geom_errorbar(data = brood_t, aes(x= S_med, y = R_med, ymin = R_lwr, ymax = R_upr), 
+                colour="grey", width=0, size=0.3) +
+  geom_errorbarh(data = brood_t, aes(x= S_med, y = R_med, xmin = S_lwr, xmax = S_upr), 
+                 colour = "grey", height=0, size = 0.3) + 
+  geom_point(data = brood_t, aes(x = S_med, y = R_med, color=BroodYear, width = 0.9), size = 3)+
+  coord_cartesian(xlim=c(0, 10), ylim=c(0,20)) +
+  scale_colour_viridis_c()+
+  xlab("Spawners (10^5)") +
+  ylab("Recruits (10^5)") +
+  theme_bw() +
+  theme(strip.text.x = element_text(size=8),
+        axis.title = element_text(size=10),
+        axis.text = element_text(size=7),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank())+
+  geom_abline(intercept = 0, slope = 1,col="dark grey")
+ggsave("./figures/zoom-spawn-recuit.jpg",height = 5, width = 6.5)
 
 ```
 
@@ -262,7 +361,9 @@ ggplot(log_prod_t, aes(x=year, y = mid), show.legend = F) +
   xlab("Brood year") +
   ylab("Productivity (log) ") +
   theme(legend.position = "none") +
-  theme_bw()
+  theme_bw() + 
+  geom_abline(intercept = 0, slope = 0 ,col="dark grey", lty=2)
+
 ggsave("./figures/time-vary-prod.jpg",height = 4.5, width = 6)
 
 ```
@@ -316,20 +417,29 @@ sum(bench[,5],na.rm=T)/10000
 sum(bench[,6],na.rm=T)/10000
 sum(bench[,7],na.rm=T)/10000
 
-# recent Smsy (last 35 years)
-recent_smsy <- matrix(NA,10000)
+bench_long <- pivot_longer(data = as.data.frame(bench[,1:3]),
+             cols = c("lower_bm","upper_bm","recent_abund"),
+             names_to = "metric",
+             values_to = "value")
 
-for(i in 1:10000){
-  r <- sample(seq(1,1000),1,replace=T)
-  a <- median(pars$lnalpha_c[r]+pars$lnresid[r,(72-35):72])
-  b <- pars$beta[r]
-  smsy[i] <- 
-  S_max <- 1/b;
-  S_eq <- a * S_max;
-  recent_smsy[i] = S_eq * (0.5 - 0.07 * a);
-}
+sub_bench_long <- subset(bench_long, value < 20)
 
-apply(recent_smsy, 2, quantile, probs=c(0.025,0.25,0.5,0.75,0.975), na.rm=T)
+ggplot(sub_bench_long, aes(x=value, fill=metric)) + 
+  geom_histogram(alpha=0.6, position="identity", bins = 150)+
+  xlab("Spawners (^5)") +
+  ylab("Count") + 
+  scale_fill_manual(values=c("red", "black", "dark green")) +
+  coord_cartesian(xlim=c(0, 7), ylim=c(0,2500)) +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank()) +
+  labs(fill = "Metric" )+
+  geom_vline(xintercept=c(bench.quant[3,1],bench.quant[3,2],bench.quant[3,3]),
+             color=c("red","dark green","black"),
+             alpha=0.7,
+             lwd=1)
+
+ggsave("./figures/status.jpg",height = 4, width = 6.75)
 
 ```
 

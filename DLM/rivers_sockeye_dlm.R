@@ -107,7 +107,7 @@ AICc
 # estimated parameters
 # alpha and beta rows are the estimates of the parameters from the dlm
 
-jpeg("./FIGURES/Rivers_DLM_comparision.jpg",width=7, height=5, units="in",res=800)
+jpeg("./DLM/figures/Rivers_DLM_comparision.jpg",width=7, height=5, units="in",res=800)
 
 par(mfcol=c(3,4),mar=c(.1,.1,.1,.1),oma=c(4,5,5,4),las=1)
 plotSB<-seq(0,max(Tssb),10)
@@ -121,26 +121,29 @@ for(x in 1:4)
     lines(plotSB*exp(alpha[y,x]+plotSB*beta[y,x])~plotSB,col=time_col[y])
   points(recr~Tssb,xlim=c(0,max(Tssb)),ylim=c(-0.5,max(recr)),xaxt='n',pch=16)
   legend('topleft',bty='n',legend_txt[x])
+  box(col="grey")
   if(x==1)
   {
-    axis(side=2,las=1)
-    axis(side=3,las=1)
+    axis(side=2,las=1,col="grey")
+    axis(side=3,las=1,col="grey")
     mtext(side=2,"Recruits",las=0,line=3.5)
     mtext(side=3,"Spawners",line=2.25)
   }
   
   plot(alpha[,x]~BY,yaxt='n',xaxt='n',type='l',ylim=c(min(alpha),max(alpha)))
+  box(col="grey")
   if(x==1)
   {
-    axis(side=2,las=1)
+    axis(side=2,las=1, col="grey")
     mtext(side=2,"Alpha",las=0,line=3.5)
   }
 
   plot(beta[,x]~ BY,yaxt='n',xaxt='n',type='l',ylim=c(min(beta),max(beta)))
+  box(col="grey")
   if(x==1)
   {
-    axis(side=2,las=1)
-    axis(side=1,las=1)
+    axis(side=2,las=1, col="grey", at=c(-0.02,-0.015,-0.01,-0.005))
+    axis(side=1,las=1,col="grey")
     mtext(side=2,"Beta",las=0,line=3.5)
   }
   }
@@ -163,4 +166,4 @@ ggplot(kalman_fit$df, aes(x=BY, y = a.smooth ), show.legend = F) +
   theme(legend.position = "none") +
   geom_hline(yintercept = 0, lty = "dotted") +
   theme_bw()
-ggsave("./FIGURES/kalman_prod_index.jpg",height = 3, width = 8.5)
+ggsave("./DLM/figures/kalman_prod_index.jpg",height = 3, width = 6)
