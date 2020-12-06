@@ -106,8 +106,8 @@ transformed parameters{
 model{
   // Priors
   lnalpha ~ normal(0,3);
-  beta ~ normal(0,1);
-  //beta ~ normal(0.1638,0.05); // PR based prior, inverse of PR based Smax in units of 100,000s, so if Smax = 6.10354 then mean of prior is 1/6.10354 = 0.1638
+  //beta ~ normal(0,1);
+  beta ~ normal(0.1638,0.05); // PR based prior, inverse of PR based Smax in units of 100,000s, so if Smax = 6.10354 then mean of prior is 1/6.10354 = 0.1638
   sigma_R ~ normal(0,2);
   lnresid_0 ~ normal(0,20);
   mean_ln_R0 ~ normal(0,20);
