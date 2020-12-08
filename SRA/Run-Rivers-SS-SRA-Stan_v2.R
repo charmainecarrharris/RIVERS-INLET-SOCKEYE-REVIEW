@@ -50,7 +50,7 @@ A_esc_comp[42:72,5] <- 60 # assume ESS equal to 100 for years with data
 A_esc_comp[1:41,5] <- 25 # assume ESS of 50 for years without age comp sample size data
 
 # write to file in case needed elsewhere
-A_comp_print <- cbind(seq(1948,2019),A_esc_comp)
+A_esc_comp_print <- cbind(seq(1948,2019),A_esc_comp)
                       
 colnames(A_esc_comp_print) <-  c("year","3_yr_olds","4_yr_olds","5_yr_olds","6_yr_olds","ESS")
 write.csv(A_esc_comp_print,
@@ -88,6 +88,22 @@ write.csv(A_har_comp_print,
 
 # age observations in integers, sum of ages by year is assumed to be equivalent to ESS
 H_comps <- round(A_har_comp[,1:4]*A_har_comp[,5])
+
+
+
+# # SUBSET to after 1993
+# Esc <- Esc[46:72]
+# Har <- Har[46:72]
+# S_cv <- S_cv[46:72]
+# H_cv <- H_cv[46:72]
+# a_min <- 3
+# a_max <- 6
+# nyrs <- length(Esc)
+# A <- a_max - a_min + 1
+# nRyrs <- nyrs + A - 1
+# H_comps <- H_comps[46:72,]
+# S_comps <- S_comps[46:72,]
+
 
 # Initialize Model Parameters ======================================================================
 
