@@ -9,8 +9,10 @@ library(dlm)
 library(viridis)
 library(here)
 library(tidyverse)
-source("Kalman_code.R")
+
 setwd(here())
+
+source("Kalman_code.R")
 
 # create brood table ===============================================================================
 Esc <- read.csv('DATA/Data_report_tables/Table_3_Expanded_estimates.csv')[,2];Esc <- Esc[!is.na(Esc)]
@@ -42,8 +44,8 @@ btf <- as.data.frame(brood[complete.cases(brood), ]) # drop incomplete brood yea
 
 # pre process for DLM ===============================================================================
 
-recr		<-btf$recruits/10000
-Tssb		<-btf$spawners/10000
+recr		<-btf$recruits/100000
+Tssb		<-btf$spawners/100000
 BY <- btf$year
 
 lnRS	<-log(btf$recruits/btf$spawners)
@@ -110,7 +112,7 @@ AICc
 jpeg("./DLM/figures/Rivers_DLM_comparision.jpg",width=7, height=5, units="in",res=800)
 
 par(mfcol=c(3,4),mar=c(.1,.1,.1,.1),oma=c(4,5,5,4),las=1)
-plotSB<-seq(0,max(Tssb),10)
+plotSB<-seq(0,max(Tssb),1)
 time_col <- viridis(nrow(alpha))
 
 legend_txt<-c("Static","Alpha varies","Beta varies","Both vary")
@@ -126,8 +128,8 @@ for(x in 1:4)
   {
     axis(side=2,las=1,col="grey")
     axis(side=3,las=1,col="grey")
-    mtext(side=2,"Recruits",las=0,line=3.5)
-    mtext(side=3,"Spawners",line=2.25)
+    mtext(side=2,"Recruits (^5)",las=0,line=3.5)
+    mtext(side=3,"Spawners (^5)",line=2.25)
   }
   
   plot(alpha[,x]~BY,yaxt='n',xaxt='n',type='l',ylim=c(min(alpha),max(alpha)))
@@ -142,7 +144,7 @@ for(x in 1:4)
   box(col="grey")
   if(x==1)
   {
-    axis(side=2,las=1, col="grey", at=c(-0.02,-0.015,-0.01,-0.005))
+    axis(side=2,las=1, col="grey", at=c(-0.2,-0.15,-0.1,-0.05))
     axis(side=1,las=1,col="grey")
     mtext(side=2,"Beta",las=0,line=3.5)
   }
@@ -164,6 +166,8 @@ ggplot(kalman_fit$df, aes(x=BY, y = a.smooth ), show.legend = F) +
   xlab("Brood year") +
   ylab("Productivity index") +
   theme(legend.position = "none") +
-  geom_hline(yintercept = 0, lty = "dotted") +
-  theme_bw()
-ggsave("./DLM/figures/kalman_prod_index.jpg",height = 3, width = 6)
+  geom_abline(intercept = 0, slope = 0 ,col="dark grey", lty=2) +
+  theme_bw()+
+  coord_cartesian(ylim=c(-2.25,3)) 
+
+ggsave("./DLM/figures/kalman_prod_index.jpg",height = 4, width = 6.5)
